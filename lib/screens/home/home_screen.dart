@@ -17,9 +17,11 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   @override
   Widget build(BuildContext context) {
-    // Get an updated version of all orders (keep listening)
-    final List<Order> ordersList =
-        Provider.of<OrdersBotsManager>(context, listen: true).allOrders;
+    final OrdersBotsManager ordersBotsManagerProvider =
+        Provider.of<OrdersBotsManager>(context, listen: true);
+
+    // Get an updated list of all orders
+    final List<Order> ordersList = ordersBotsManagerProvider.allOrders;
 
     return Scaffold(
       appBar: AppBar(
@@ -73,11 +75,11 @@ class _HomeScreenState extends State<HomeScreen> {
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Text(
-                    'Number of Bots: ${Provider.of<OrdersBotsManager>(context).numOfBots}',
+                    'Number of Bots: ${ordersBotsManagerProvider.numOfBots}',
                     style: const TextStyle(fontWeight: FontWeight.bold),
                   ),
                   Text(
-                    'Number of Busy Bots: ${Provider.of<OrdersBotsManager>(context).numOfBusyBots}',
+                    'Number of Busy Bots: ${ordersBotsManagerProvider.numOfBusyBots}',
                     style: const TextStyle(fontWeight: FontWeight.bold),
                   ),
                 ],

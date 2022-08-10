@@ -1,15 +1,14 @@
-import 'package:async/async.dart';
+import 'dart:async';
 
 class Bot {
-  CancelableOperation? _cancelableProcessOrder;
+  int id;
+  bool isBusy = false;
+  Timer? _timer;
 
-  void processOrder(Function callback) {
-    _cancelableProcessOrder = CancelableOperation.fromFuture(
-        Future.delayed(const Duration(seconds: 10)));
+  Bot({required this.id});
 
-    _cancelableProcessOrder?.then((_) => callback());
-  }
+  void processOrder(Function callback) =>
+      _timer = Timer(const Duration(seconds: 10), () => callback());
 
-  void stopProcessingOrder(Function callback) =>
-      _cancelableProcessOrder?.cancel().then((_) => callback());
+  void stopProcessingOrder() => _timer?.cancel();
 }

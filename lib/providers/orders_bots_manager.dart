@@ -3,7 +3,7 @@ import 'package:feedmepos_se_take_home_assignment/models/bot.dart';
 import 'package:feedmepos_se_take_home_assignment/models/order.dart';
 
 class OrdersBotsManager extends ChangeNotifier {
-  // Number of all orders, it's used to give incremental id to new orders.
+  // Total number of all orders, it's used to give incremental id to new orders.
   int _numOfOrders = 0;
 
   // Queues to store pending vip & normal orders, however pushing in front
@@ -12,8 +12,7 @@ class OrdersBotsManager extends ChangeNotifier {
   final List<Order> _pendingVipOrders = [];
   final List<Order> _pendingNormalOrders = [];
 
-  // Queue to store orders being processed, however removing the newest order is
-  // allowed to handle the case when a bot is shut down while processing an order.
+  // List to store orders that are processed
   final List<Order> _processingOrders = [];
 
   // List to store all completed orders.
@@ -46,14 +45,13 @@ class OrdersBotsManager extends ChangeNotifier {
   // Stack to store all bots in the system.
   final List<Bot> _bots = [];
 
-  // Total number of running bots.
   int get numOfBots => _bots.length;
 
   // Total number of bots that process orders.
-  int get numOfBusyBots => _processingOrders.length;
+  int get numOfBusyBots => _bots.where((bot) => bot.isBusy).length;
 
   void addBot() {
-    _bots.add(Bot());
+    _bots.add(Bot(id: _bots.length));
     notifyListeners();
 
     // Trigger the function responsible for processing orders when a new bot is added.
@@ -61,27 +59,29 @@ class OrdersBotsManager extends ChangeNotifier {
   }
 
   void removeBot() {
-    // Don't operate when there's no any bots.
-    if (numOfBots <= 0) return;
+    if (_bots.isEmpty) return;
 
     // Handling the case when the bot being removed, is processing an order.
-    if (numOfBots == numOfBusyBots) {
-      // Fetch & remove the newest order in the _processingOrders queue.
-      final Order newestProcessingOrder = _processingOrders.removeLast();
+    if (_bots.last.isBusy) {
+      // lookup the order that is currently processed by last added bot
+      final Order orderToCancel = _processingOrders
+          .firstWhere((order) => order.processingBotId == _bots.last.id);
 
-      // Command the bot to be removed from the queue to stop processing, then
-      // re-push (in front) the the order into the respective pending queue.
-      _bots.last.stopProcessingOrder(() {
-        newestProcessingOrder.status = Status.PENDING;
-        if (newestProcessingOrder.isVip) {
-          _pendingVipOrders.insert(0, newestProcessingOrder);
-        } else {
-          _pendingNormalOrders.insert(0, newestProcessingOrder);
-        }
-      });
+      // change order's state, remove it from _processingOrders list, & re-insert into pending Q.
+      orderToCancel.status = Status.PENDING;
+      orderToCancel.processingBotId = null;
+      _processingOrders.removeWhere((order) => order.processingBotId == null);
+
+      if (orderToCancel.isVip) {
+        _pendingVipOrders.insert(0, orderToCancel);
+      } else {
+        _pendingNormalOrders.insert(0, orderToCancel);
+      }
+
+      // cancel/stop the processing operation
+      _bots.last.stopProcessingOrder();
     }
 
-    // Pop the last bot in the bots stack.
     _bots.removeLast();
 
     notifyListeners();
@@ -91,27 +91,34 @@ class OrdersBotsManager extends ChangeNotifier {
     // Keep iterating over the pending queues as long as they aren't empty.
     while (_pendingVipOrders.isNotEmpty || _pendingNormalOrders.isNotEmpty) {
       // Don't operate when all bots are busy.
-      if (numOfBots == numOfBusyBots) return;
+      if (_bots.length == numOfBusyBots) return;
 
       // Pop an order from the pending queues, considering the priorities.
       Order poppedOrder = _pendingVipOrders.isNotEmpty
           ? _pendingVipOrders.removeAt(0)
           : _pendingNormalOrders.removeAt(0);
 
-      // Push the popped order to the _processingOrders queue.
+      // Assign order to free bot & push the popped order to the _processingOrders list.
+      final Bot handlerBot = _bots.firstWhere((bot) => !bot.isBusy);
+      handlerBot.isBusy = true;
+
       poppedOrder.status = Status.PROCESSING;
+      poppedOrder.processingBotId = handlerBot.id;
       _processingOrders.add(poppedOrder);
 
-      notifyListeners();
+      // start processing the order. NOTE: the callback function will be executed only if the processing wasn't stopped.
+      handlerBot.processOrder(() {
+        // Remove the popped/completed the order from the _processingOrders list.
+        _processingOrders.removeWhere((order) => order.id == poppedOrder.id);
 
-      // Command the first free bot in the bots queue to process the popped order.
-      // Notably, the callback function will be executed only if the processing wasn't stopped.
-      _bots[numOfBusyBots - 1].processOrder(() {
-        // Remove the oldest/completed the order from the _processingOrders queue.
         // And add that completed order to the completed orders list after changing its status.
-        _processingOrders.removeAt(0);
         poppedOrder.status = Status.COMPLETE;
         _completedOrders.insert(0, poppedOrder);
+
+        // change handler bot's status from busy to free
+        handlerBot.isBusy = false;
+
+        // update UI
         notifyListeners();
 
         // Trigger the function responsible for processing orders when an order is completed.

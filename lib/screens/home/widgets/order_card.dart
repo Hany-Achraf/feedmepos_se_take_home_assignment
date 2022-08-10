@@ -22,7 +22,9 @@ class OrderCard extends StatelessWidget {
       child: ListTile(
         leading: const Icon(Icons.assistant_rounded),
         title: Text('Order# ${order.id} ${order.isVip ? "(VIP)" : ""}'),
-        subtitle: const Text('order details...'),
+        subtitle: Text(order.processingBotId != null
+            ? 'Handled by Bot #${order.processingBotId}'
+            : 'Unhandled'),
         trailing: Text(
           order.status.toString().split('.')[1],
         ),
