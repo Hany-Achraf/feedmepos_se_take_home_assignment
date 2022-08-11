@@ -6,7 +6,7 @@ class OrdersBotsManager extends ChangeNotifier {
   // Total number of all orders, it's used to give incremental id to new orders.
   int _numOfOrders = 0;
 
-  // Queues to store pending vip & normal orders, however pushing in front
+  // Queues to store pending vip & normal orders, however random insertion
   // is allowed to re-insert an order that is currently being processed by
   // a bot when it's shut down by the manager.
   final List<Order> _pendingVipOrders = [];
@@ -73,9 +73,25 @@ class OrdersBotsManager extends ChangeNotifier {
       _processingOrders.removeWhere((order) => order.processingBotId == null);
 
       if (orderToCancel.isVip) {
-        _pendingVipOrders.insert(0, orderToCancel);
+        if (_pendingVipOrders.isEmpty ||
+            _pendingVipOrders.last.id < orderToCancel.id) {
+          _pendingVipOrders.add(orderToCancel);
+        } else {
+          _pendingVipOrders.insert(
+              _pendingVipOrders.indexOf(_pendingVipOrders
+                  .firstWhere((order) => order.id > orderToCancel.id)),
+              orderToCancel);
+        }
       } else {
-        _pendingNormalOrders.insert(0, orderToCancel);
+        if (_pendingNormalOrders.isEmpty ||
+            _pendingNormalOrders.last.id < orderToCancel.id) {
+          _pendingNormalOrders.add(orderToCancel);
+        } else {
+          _pendingNormalOrders.insert(
+              _pendingNormalOrders.indexOf(_pendingNormalOrders
+                  .firstWhere((order) => order.id > orderToCancel.id)),
+              orderToCancel);
+        }
       }
 
       // cancel/stop the processing operation
